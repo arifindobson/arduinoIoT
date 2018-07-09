@@ -44,7 +44,7 @@
 
 const int PULSE_INPUT = A0;
 const int THRESHOLD = 550;   // Adjust this number to avoid noise when idle
-
+unsigned long oldTime = 0;
 
 /*
    All the PulseSensor Playground functions.
@@ -69,15 +69,18 @@ void setup() {
 void loop() {
   
   int myBPM = pulseSensor.getBeatsPerMinute();
+  unsigned long currentMillis = millis();
   
   if (pulseSensor.sawNewSample()) {
-      Serial.println("tiga");
+      //Serial.println("tiga");
       if (pulseSensor.sawStartOfBeat()) {
        //Serial.println("♥  A HeartBeat Happened ! "); // If test is "true", print a message "a heartbeat happened".
        Serial.print("BPM: ");                        // Print phrase "BPM: " 
        Serial.println(myBPM);                        // Print the value inside of myBPM.     
+       oldTime = currentMillis;
+       Serial.println(oldTime);
        }
   }
-
+  
 
 }

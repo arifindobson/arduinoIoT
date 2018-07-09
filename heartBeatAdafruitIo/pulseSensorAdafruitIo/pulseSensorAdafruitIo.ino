@@ -46,15 +46,15 @@
 
 /************************* WiFi Access Point *********************************/
 
-#define WLAN_SSID       "...your SSID..."
-#define WLAN_PASS       "...your password..."
+#define WLAN_SSID       "WIFI NAME SSID"
+#define WLAN_PASS       "WIFI PASSWORD"
 
 /************************* Adafruit.io Setup *********************************/
 
 #define AIO_SERVER      "io.adafruit.com"
 #define AIO_SERVERPORT  1883                   // use 8883 for SSL
-#define AIO_USERNAME    "...your AIO username (see https://accounts.adafruit.com)..."
-#define AIO_KEY         "...your AIO key..."
+#define AIO_USERNAME    "---USERNAME---"
+#define AIO_KEY         "---IO KEY---"
 
 /************ Global State (you don't need to change this!) ******************/
 
@@ -70,7 +70,7 @@ Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO
 
 // Setup a feed called 'photocell' for publishing.
 // Notice MQTT paths for AIO follow the form: <username>/feeds/<feedname>
-Adafruit_MQTT_Publish photocell = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/pulseSensor");
+Adafruit_MQTT_Publish pulseIO = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/pulseSensor");
 
 /*************************** Sketch Code ************************************/
 
@@ -92,6 +92,9 @@ const byte SAMPLES_PER_SERIAL_SAMPLE = 10;
 */
 PulseSensorPlayground pulseSensor;
 
+unsigned long previousMillisA = 0;
+int myBPM =0;
+ 
 void setup() {
 
   Serial.begin(115200);
@@ -128,17 +131,12 @@ void setup() {
 uint32_t x=0;
 
 void loop() {
+  unsigned long currentMillis = millis();
   
-  MQTT_connect();
-
-  Serial.println("dua");
-  currentMillis = millis();   // capture the latest value of millis()
-  Serial.println(currentMillis);
-  
-  int myBPM = pulseSensor.getBeatsPerMinute();
+  myBPM = pulseSensor.getBeatsPerMinute();
   
   if (pulseSensor.sawNewSample()) {
-      Serial.println("tiga");
+      
       if (pulseSensor.sawStartOfBeat()) {
        //Serial.println("♥  A HeartBeat Happened ! "); // If test is "true", print a message "a heartbeat happened".
        Serial.print("BPM: ");                        // Print phrase "BPM: " 
@@ -146,9 +144,40 @@ void loop() {
        }
   }
 
-  if (currentMillis >= waitforpulse){
-      Serial.println(myBPM);
-      pulse->save(myBPM);
-      delay(3000);
+  if ((currentMillis - previousMillisA > 7000) && (myBPM<200)) {
+  MQTT_connect();
+  pulseIO.publish(myBPM);
+  Serial.println("Sent to Adafruit Io");   
+  delay(2000);
+  previousMillisA = currentMillis;
+  } else if ((currentMillis - previousMillisA > 7000) && (myBPM>200)) {
+    Serial.println("Wrong Reading");
+    previousMillisA = currentMillis;
+    }
+
+}
+
+void MQTT_connect() {
+  int8_t ret;
+
+  // Stop if already connected.
+  if (mqtt.connected()) {
+    return;
   }
+
+  Serial.print("Connecting to MQTT... ");
+
+  uint8_t retries = 3;
+  while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
+       Serial.println(mqtt.connectErrorString(ret));
+       Serial.println("Retrying MQTT connection in 5 seconds...");
+       mqtt.disconnect();
+       delay(5000);  // wait 5 seconds
+       retries--;
+       if (retries == 0) {
+         // basically die and wait for WDT to reset me
+         while (1);
+       }
+  }
+  Serial.println("MQTT Connected!");
 }
